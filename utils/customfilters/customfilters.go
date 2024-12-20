@@ -11,7 +11,7 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters"
 )
 
-var DB database.Database = database.NewDatabase()
+var DB *database.Database = database.NewDatabase()
 var CachedAdmins map[int64][]int64 = map[int64][]int64{}
 
 func Listen(m *gotgbot.Message) filters.Message {
@@ -21,82 +21,110 @@ func Listen(m *gotgbot.Message) filters.Message {
 }
 
 func PrivateOrGroup(msg *gotgbot.Message) bool {
-	//A Function To Filter Group & SuperGroup Message
-
-	return msg.Chat.Type == "supergroup" || msg.Chat.Type == "group" || msg.Chat.Type == "private"
+	// A Function To Filter Group & SuperGroup Message
+	return msg.Chat.Type == gotgbot.ChatTypeSupergroup || msg.Chat.Type == gotgbot.ChatTypeGroup || msg.Chat.Type == gotgbot.ChatTypePrivate
 }
 
-func Chats(chatId []int64) filters.Message {
+func Chats(chatID []int64) filters.Message {
 	return func(msg *gotgbot.Message) bool {
-		for _, c := range chatId {
+		for _, c := range chatID {
 			if c == msg.Chat.Id {
 				return true
 			}
 		}
+
 		return false
 	}
 }
 
+//nolint:errcheck // too lazy
 func Verify(bot *gotgbot.Bot, ctx *ext.Context) (int64, bool) {
-	var user_id int64
-	msg := ctx.Message
+	var (
+		userID int64
+		msg    gotgbot.MaybeInaccessibleMessage
+	)
+
 	if ctx.CallbackQuery != nil {
 		msg = ctx.CallbackQuery.Message
-		user_id = ctx.CallbackQuery.From.Id
+		userID = ctx.CallbackQuery.From.Id
 	} else {
-		user_id = msg.From.Id
+		msg = ctx.Message
+		userID = msg.(*gotgbot.Message).From.Id
 	}
-	chatType := msg.Chat.Type
+
+	chatType := msg.GetChat().Type
+	chatID := msg.GetChat().Id
+
 	var c int64
-	if chatType == "supergroup" || chatType == "group" {
-		if user_id == 0 {
-			msg.Reply(
-				bot,
+
+	switch chatType {
+	case gotgbot.ChatTypeSupergroup, gotgbot.ChatTypeGroup:
+		if userID == 0 {
+			bot.SendMessage(
+				chatID,
 				"Sorry It Looks Like You Are Anonymous Please Connect From Pm And Use Me Or Turn Off Anonymous :(",
-				&gotgbot.SendMessageOpts{},
+				&gotgbot.SendMessageOpts{
+					ReplyParameters: &gotgbot.ReplyParameters{
+						MessageId: msg.GetMessageId(),
+					},
+				},
 			)
+
 			return c, false
 		}
-		cachedAdmins, ok := CachedAdmins[msg.Chat.Id]
+
+		cachedAdmins, ok := CachedAdmins[chatID]
 		if !ok {
-			admins, e := msg.Chat.GetAdministrators(bot)
-			var newAdmins []int64
+			admins, e := msg.GetChat().GetAdministrators(bot, &gotgbot.GetChatAdministratorsOpts{})
 			if e != nil {
 				return c, false
 			}
+
+			var newAdmins []int64
+
 			for _, admin := range admins {
 				newAdmins = append(newAdmins, admin.GetUser().Id)
 			}
 
-			CachedAdmins[msg.Chat.Id] = newAdmins
+			CachedAdmins[chatID] = newAdmins
 
 			for _, admin := range newAdmins {
-				if user_id == admin {
+				if userID == admin {
 					return c, true
 				}
 			}
+
 			if ctx.CallbackQuery == nil {
-				msg.Reply(
-					bot,
+				bot.SendMessage(
+					chatID,
 					"Who dis non-admin telling me what to do !",
-					&gotgbot.SendMessageOpts{},
+					&gotgbot.SendMessageOpts{
+						ReplyParameters: &gotgbot.ReplyParameters{
+							MessageId: msg.GetMessageId(),
+						},
+					},
 				)
 			} else {
 				ctx.CallbackQuery.Answer(bot, &gotgbot.AnswerCallbackQueryOpts{Text: "Who dis non-admin telling me what to do !", ShowAlert: true})
 			}
+
 			return c, false
 		} else {
 			for _, admin := range cachedAdmins {
-				if user_id == admin {
+				if userID == admin {
 					return c, true
 				}
 			}
 
 			if ctx.CallbackQuery == nil {
-				msg.Reply(
-					bot,
+				bot.SendMessage(
+					chatID,
 					"Hey You're Not An Admin, If You Are A New Admin Use The /updateadmins Command To Update Current List !",
-					&gotgbot.SendMessageOpts{ReplyToMessageId: msg.MessageId},
+					&gotgbot.SendMessageOpts{
+						ReplyParameters: &gotgbot.ReplyParameters{
+							MessageId: msg.GetMessageId(),
+						},
+					},
 				)
 			} else {
 				ctx.CallbackQuery.Answer(bot, &gotgbot.AnswerCallbackQueryOpts{Text: "Who dis non-admin telling me what to do !", ShowAlert: true})
@@ -104,19 +132,24 @@ func Verify(bot *gotgbot.Bot, ctx *ext.Context) (int64, bool) {
 
 			return c, false
 		}
-	} else if chatType == "private" {
-		c, ok := DB.GetConnection(user_id)
+	case gotgbot.ChatTypePrivate:
+		c, ok := DB.GetConnection(userID)
 		if !ok {
-			msg.Reply(
-				bot,
-				"Sorry You Have To Connect To A Chat To Use This Command Here :(",
-				&gotgbot.SendMessageOpts{},
+			bot.SendMessage(
+				chatID,
+				"Please connect to a chat first to use this operation !",
+				&gotgbot.SendMessageOpts{
+					ReplyParameters: &gotgbot.ReplyParameters{
+						MessageId: msg.GetMessageId(),
+					},
+				},
 			)
+
 			return c, false
 		}
-		fmt.Println(c)
+
 		return c, true
-	} else {
+	default:
 		fmt.Println("Unknown ChatType ", chatType)
 		return c, false
 	}
