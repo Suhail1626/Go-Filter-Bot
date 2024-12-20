@@ -16,7 +16,7 @@ var TEXT map[string]string = map[string]string{
 <b>○ 𝖫𝖺𝗇𝗀𝗎𝖺𝗀𝖾 :</b> : <a href='https://go.dev'>GO</a>
 <b>○ 𝖫𝗂𝖻𝗋𝖺𝗋𝗒</b> : <a href='github.com/PaulSonOfLars/gotgbot'>gotgbot</a>
 <b>○ 𝖣𝖺𝗍𝖺𝖻𝖺𝗌𝖾</b> : <a href='mongodb.org'>mongoDB</a>
-<b>○ 𝖲𝗎𝗉𝗉𝗈𝗋𝗍</b> : <a href='t.me/Jisin0'>Here</a>
+<b>○ 𝖲𝗎𝗉𝗉𝗈𝗋𝗍</b> : <a href='t.me/primeSupGroup'>Here</a>
 	`,
 
 	"MF": `
@@ -102,7 +102,7 @@ var BUTTONS map[string][][]gotgbot.InlineKeyboardButton = map[string][][]gotgbot
 			{Text: "Home", CallbackData: "edit(START)"},
 			{Text: "Stats", CallbackData: "stats"},
 		}, {
-			{Text: "Source 🔗", Url: "https://github.com/Jisin0/Go-Filter-Bot"},
+			{Text: "Updates 🔗", Url: "https://t.me/PrimeBotsUpdates"},
 		},
 	},
 	"STATS": {
